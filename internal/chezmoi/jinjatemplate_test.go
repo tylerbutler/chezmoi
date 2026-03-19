@@ -89,3 +89,30 @@ func TestJinjaTemplateDirective(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "line1\r\nline2\r\n", string(result))
 }
+
+func TestJinjaTemplateFilterChaining(t *testing.T) {
+	engine := &JinjaTemplate{}
+	err := engine.Parse("test", []byte(`{{ name | upper }}`), TemplateOptions{})
+	assert.NoError(t, err)
+	result, err := engine.Execute(map[string]any{"name": "alice"})
+	assert.NoError(t, err)
+	assert.Equal(t, "ALICE", string(result))
+}
+
+func TestJinjaTemplateDefaultFilter(t *testing.T) {
+	engine := &JinjaTemplate{}
+	err := engine.Parse("test", []byte(`{{ missing | default("fallback") }}`), TemplateOptions{})
+	assert.NoError(t, err)
+	result, err := engine.Execute(map[string]any{})
+	assert.NoError(t, err)
+	assert.Equal(t, "fallback", string(result))
+}
+
+func TestJinjaTemplateExpression(t *testing.T) {
+	engine := &JinjaTemplate{}
+	err := engine.Parse("test", []byte(`{{ "hello " ~ name }}`), TemplateOptions{})
+	assert.NoError(t, err)
+	result, err := engine.Execute(map[string]any{"name": "world"})
+	assert.NoError(t, err)
+	assert.Equal(t, "hello world", string(result))
+}
