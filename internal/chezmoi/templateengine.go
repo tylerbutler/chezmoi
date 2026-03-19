@@ -12,6 +12,16 @@ const (
 // JinjaSuffix is the file extension for Jinja templates.
 const JinjaSuffix = ".j2"
 
+// NewTemplateEngine creates a TemplateEngine of the given type.
+func NewTemplateEngine(engineType TemplateEngineType) TemplateEngine {
+	switch engineType {
+	case TemplateEngineJinja:
+		return &JinjaTemplate{}
+	default:
+		return &GoTemplate{}
+	}
+}
+
 // TemplateEngine is the interface for template engines.
 type TemplateEngine interface {
 	// Parse parses template source bytes with the given name and options.

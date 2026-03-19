@@ -864,6 +864,7 @@ type ExecuteTemplateDataOptions struct {
 	Data            []byte
 	TemplateOptions TemplateOptions
 	ExtraData       map[string]any
+	EngineType      TemplateEngineType
 }
 
 // ExecuteTemplateData returns the result of executing template data.
@@ -872,14 +873,21 @@ func (s *SourceState) ExecuteTemplateData(options ExecuteTemplateDataOptions) ([
 	templateOptions.Funcs = s.templateFuncs
 	templateOptions.Options = slices.Clone(s.templateOptions)
 
-	tmpl, err := ParseTemplate(options.NameRelPath.String(), options.Data, templateOptions)
-	if err != nil {
+	engineType := options.EngineType
+	if engineType == "" {
+		engineType = TemplateEngineGo
+	}
+
+	engine := NewTemplateEngine(engineType)
+	if err := engine.Parse(options.NameRelPath.String(), options.Data, templateOptions); err != nil {
 		return nil, err
 	}
 
 	for name, t := range s.templates {
-		if err = tmpl.AddSubTemplate(name, t); err != nil {
-			return nil, err
+		if t.EngineType() == engine.EngineType() {
+			if err := engine.AddSubTemplate(name, t); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -891,7 +899,7 @@ func (s *SourceState) ExecuteTemplateData(options ExecuteTemplateDataOptions) ([
 	}
 	RecursiveMerge(templateData, options.ExtraData)
 
-	result, err := tmpl.Execute(templateData)
+	result, err := engine.Execute(templateData)
 	if errors.Is(err, errReturnEmpty) {
 		return nil, nil
 	}
@@ -1624,15 +1632,27 @@ func (s *SourceState) addTemplatesDir(ctx context.Context, templatesDirAbsPath A
 			templateRelPath := templateAbsPath.MustTrimDirPrefix(templatesDirAbsPath)
 			name := templateRelPath.String()
 
-			tmpl, err := ParseTemplate(name, contents, TemplateOptions{
+			templateOptions := TemplateOptions{
 				Funcs:   s.templateFuncs,
 				Options: slices.Clone(s.templateOptions),
-			})
-			if err != nil {
-				return err
+			}
+
+			var engine TemplateEngine
+			if strings.HasSuffix(name, JinjaSuffix) {
+				jinja := &JinjaTemplate{}
+				if err := jinja.Parse(name, contents, templateOptions); err != nil {
+					return err
+				}
+				engine = jinja
+			} else {
+				tmpl, err := ParseTemplate(name, contents, templateOptions)
+				if err != nil {
+					return err
+				}
+				engine = tmpl
 			}
 			s.mutex.Lock()
-			s.templates[name] = tmpl
+			s.templates[name] = engine
 			s.mutex.Unlock()
 			return nil
 		case fileInfo.IsDir():
@@ -1653,9 +1673,14 @@ func (s *SourceState) executeTemplate(templateAbsPath AbsPath) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	var engineType TemplateEngineType
+	if strings.HasSuffix(templateAbsPath.String(), JinjaSuffix) {
+		engineType = TemplateEngineJinja
+	}
 	return s.ExecuteTemplateData(ExecuteTemplateDataOptions{
 		NameRelPath: templateAbsPath.MustTrimDirPrefix(s.sourceDirAbsPath),
 		Data:        data,
+		EngineType:  engineType,
 	})
 }
 
@@ -1927,6 +1952,7 @@ func (s *SourceState) newCreateTargetStateEntryFunc(
 						NameRelPath: sourceRelPath.RelPath(),
 						Data:        contents,
 						DestAbsPath: destAbsPath,
+						EngineType:  fileAttr.TemplateEngine,
 					})
 					if err != nil {
 						return nil, err
@@ -1984,6 +2010,7 @@ func (s *SourceState) newFileTargetStateEntryFunc(
 					NameRelPath: sourceRelPath.RelPath(),
 					Data:        contents,
 					DestAbsPath: destAbsPath,
+					EngineType:  fileAttr.TemplateEngine,
 				})
 				if err != nil {
 					return nil, err
@@ -2034,6 +2061,7 @@ func (s *SourceState) newModifyTargetStateEntryFunc(
 					NameRelPath: sourceRelPath.RelPath(),
 					Data:        modifierContents,
 					DestAbsPath: destAbsPath,
+					EngineType:  fileAttr.TemplateEngine,
 				})
 				if err != nil {
 					return nil, err
@@ -2145,6 +2173,7 @@ func (s *SourceState) newScriptTargetStateEntryFunc(
 					NameRelPath: sourceRelPath.RelPath(),
 					Data:        contents,
 					DestAbsPath: destAbsPath,
+					EngineType:  fileAttr.TemplateEngine,
 				})
 				if err != nil {
 					return nil, err
@@ -2184,6 +2213,7 @@ func (s *SourceState) newSymlinkTargetStateEntryFunc(
 					NameRelPath: sourceRelPath.RelPath(),
 					Data:        linknameBytes,
 					DestAbsPath: destAbsPath,
+					EngineType:  fileAttr.TemplateEngine,
 				})
 				if err != nil {
 					return "", err
