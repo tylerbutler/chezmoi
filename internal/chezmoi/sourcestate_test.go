@@ -1483,8 +1483,8 @@ func TestSourceStateRead(t *testing.T) {
 			},
 			expectedSourceState: NewSourceState(
 				withTemplates(
-					map[string]*Template{
-						"template": {
+					map[string]TemplateEngine{
+						"template": &GoTemplate{
 							name: "template",
 							template: template.Must(
 								template.New("template").
@@ -2232,7 +2232,7 @@ func withUserTemplateData(templateData map[string]any) SourceStateOption {
 	}
 }
 
-func withTemplates(templates map[string]*Template) SourceStateOption {
+func withTemplates(templates map[string]TemplateEngine) SourceStateOption {
 	return func(s *SourceState) {
 		s.templates = templates
 	}

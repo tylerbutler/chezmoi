@@ -148,7 +148,7 @@ type SourceState struct {
 	templateData            map[string]any
 	templateFuncs           template.FuncMap
 	templateOptions         []string
-	templates               map[string]*Template
+	templates               map[string]TemplateEngine
 	externals               map[RelPath][]*External
 	ignoredRelPaths         chezmoiset.Set[RelPath]
 	warnFunc                WarnFunc
@@ -323,7 +323,7 @@ func NewSourceState(options ...SourceStateOption) *SourceState {
 		priorityTemplateData: make(map[string]any),
 		userTemplateData:     make(map[string]any),
 		templateOptions:      DefaultTemplateOptions,
-		templates:            make(map[string]*Template),
+		templates:            make(map[string]TemplateEngine),
 		externals:            make(map[RelPath][]*External),
 		ignoredRelPaths:      chezmoiset.New[RelPath](),
 	}
@@ -877,9 +877,8 @@ func (s *SourceState) ExecuteTemplateData(options ExecuteTemplateDataOptions) ([
 		return nil, err
 	}
 
-	for _, t := range s.templates {
-		tmpl, err = tmpl.AddParseTree(t)
-		if err != nil {
+	for name, t := range s.templates {
+		if err = tmpl.AddSubTemplate(name, t); err != nil {
 			return nil, err
 		}
 	}
@@ -2051,7 +2050,7 @@ func (s *SourceState) newModifyTargetStateEntryFunc(
 			if matches := modifyTemplateRx.FindAllSubmatchIndex(modifierContents, -1); matches != nil {
 				sourceFile := sourceRelPath.String()
 				templateContents := removeMatches(modifierContents, matches)
-				var tmpl *Template
+				var tmpl *GoTemplate
 				tmpl, err = ParseTemplate(sourceFile, templateContents, TemplateOptions{
 					Funcs:   s.templateFuncs,
 					Options: slices.Clone(s.templateOptions),

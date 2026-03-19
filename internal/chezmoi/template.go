@@ -2,27 +2,14 @@ package chezmoi
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
-	"maps"
 	"strconv"
 	"strings"
 	"text/template"
 
-	"github.com/BurntSushi/toml"
-	"github.com/goccy/go-yaml"
-	"github.com/mattn/go-runewidth"
-	"github.com/mitchellh/copystructure"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/unicode"
 )
-
-// A Template extends [text/template.Template] with support for directives.
-type Template struct {
-	name     string
-	template *template.Template
-	options  TemplateOptions
-}
 
 // TemplateOptions are template options that can be set with directives.
 type TemplateOptions struct {
@@ -35,97 +22,14 @@ type TemplateOptions struct {
 	Options        []string
 }
 
-// ParseTemplate parses a template named name from data with the given funcs and
-// templateOptions.
-func ParseTemplate(name string, data []byte, options TemplateOptions) (*Template, error) {
-	contents, err := options.parseAndRemoveDirectives(data)
-	if err != nil {
+// ParseTemplate parses a template named name from data with the given options
+// and returns a GoTemplate.
+func ParseTemplate(name string, data []byte, options TemplateOptions) (*GoTemplate, error) {
+	t := &GoTemplate{}
+	if err := t.Parse(name, data, options); err != nil {
 		return nil, err
 	}
-	funcs := options.Funcs
-	if options.FormatIndent != "" {
-		funcs = maps.Clone(funcs)
-		funcs["toJson"] = func(data any) string {
-			var builder strings.Builder
-			encoder := json.NewEncoder(&builder)
-			encoder.SetIndent("", options.FormatIndent)
-			if err := encoder.Encode(data); err != nil {
-				panic(err)
-			}
-			return builder.String()
-		}
-		funcs["toToml"] = func(data any) string {
-			var builder strings.Builder
-			encoder := toml.NewEncoder(&builder)
-			encoder.Indent = options.FormatIndent
-			if err := encoder.Encode(data); err != nil {
-				panic(err)
-			}
-			return builder.String()
-		}
-		funcs["toYaml"] = func(data any) string {
-			var builder strings.Builder
-			encoder := yaml.NewEncoder(&builder,
-				yaml.Indent(runewidth.StringWidth(options.FormatIndent)),
-			)
-			if err := encoder.Encode(data); err != nil {
-				panic(err)
-			}
-			return builder.String()
-		}
-	}
-	tmpl, err := template.New(name).
-		Option(options.Options...).
-		Delims(options.LeftDelimiter, options.RightDelimiter).
-		Funcs(funcs).
-		Parse(string(contents))
-	if err != nil {
-		return nil, err
-	}
-	return &Template{
-		name:     name,
-		template: tmpl,
-		options:  options,
-	}, nil
-}
-
-// AddParseTree adds tmpl's parse tree to t.
-func (t *Template) AddParseTree(tmpl *Template) (*Template, error) {
-	var err error
-	t.template, err = t.template.AddParseTree(tmpl.name, tmpl.template.Tree)
-	return t, err
-}
-
-// Execute executes t with data.
-func (t *Template) Execute(data any) ([]byte, error) {
-	if data != nil {
-		// Make a deep copy of data, in case any template functions modify it.
-		var err error
-		data, err = copystructure.Copy(data)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	var builder strings.Builder
-	if err := t.template.ExecuteTemplate(&builder, t.name, data); err != nil {
-		return nil, err
-	}
-
-	result := []byte(replaceLineEndings(builder.String(), t.options.LineEnding))
-	if t.options.Encoding != nil {
-		return t.options.Encoding.NewEncoder().Bytes(result)
-	}
-	return result, nil
-}
-
-// ExecuteString executes t with s.
-func (t *Template) ExecuteString(data any) (string, error) {
-	resultBytes, err := t.Execute(data)
-	if err != nil {
-		return "", err
-	}
-	return string(resultBytes), err
+	return t, nil
 }
 
 // parseAndRemoveDirectives updates o by parsing all template directives in data
