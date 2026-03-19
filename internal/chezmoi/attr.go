@@ -69,16 +69,17 @@ type DirAttr struct {
 
 // A FileAttr holds attributes parsed from a source file name.
 type FileAttr struct {
-	TargetName string
-	Type       SourceFileTargetType
-	Condition  ScriptCondition
-	Empty      bool
-	Encrypted  bool
-	Executable bool
-	Order      ScriptOrder
-	Private    bool
-	ReadOnly   bool
-	Template   bool
+	TargetName     string
+	Type           SourceFileTargetType
+	Condition      ScriptCondition
+	Empty          bool
+	Encrypted      bool
+	Executable     bool
+	Order          ScriptOrder
+	Private        bool
+	ReadOnly       bool
+	Template       bool
+	TemplateEngine TemplateEngineType
 }
 
 type invalidDirNameError string
@@ -194,6 +195,7 @@ func parseFileAttr(name, encryptedSuffix string) (FileAttr, error) {
 		private        = false
 		readOnly       = false
 		template       = false
+		templateEngine TemplateEngineType
 	)
 	switch {
 	case strings.HasPrefix(name, createPrefix):
@@ -259,25 +261,32 @@ func parseFileAttr(name, encryptedSuffix string) (FileAttr, error) {
 	switch {
 	case strings.HasSuffix(name, literalSuffix):
 		name = name[:len(name)-len(literalSuffix)]
+	case strings.HasSuffix(name, JinjaSuffix):
+		name = name[:len(name)-len(JinjaSuffix)]
+		template = true
+		templateEngine = TemplateEngineJinja
+		name, _ = strings.CutSuffix(name, literalSuffix)
 	case strings.HasSuffix(name, TemplateSuffix):
 		name = name[:len(name)-len(TemplateSuffix)]
 		template = true
+		templateEngine = TemplateEngineGo
 		name, _ = strings.CutSuffix(name, literalSuffix)
 	}
 	if name == "" {
 		return FileAttr{}, invalidFileNameError(originalName)
 	}
 	return FileAttr{
-		TargetName: namePrefix + name,
-		Type:       sourceFileType,
-		Condition:  condition,
-		Empty:      empty,
-		Encrypted:  encrypted,
-		Executable: executable,
-		Order:      order,
-		Private:    private,
-		ReadOnly:   readOnly,
-		Template:   template,
+		TargetName:     namePrefix + name,
+		Type:           sourceFileType,
+		Condition:      condition,
+		Empty:          empty,
+		Encrypted:      encrypted,
+		Executable:     executable,
+		Order:          order,
+		Private:        private,
+		ReadOnly:       readOnly,
+		Template:       template,
+		TemplateEngine: templateEngine,
 	}, nil
 }
 
@@ -294,6 +303,7 @@ func (fa FileAttr) LogValue() slog.Value {
 		slog.Bool("Private", fa.Private),
 		slog.Bool("ReadOnly", fa.ReadOnly),
 		slog.Bool("Template", fa.Template),
+		slog.String("TemplateEngine", string(fa.TemplateEngine)),
 	)
 }
 
@@ -379,7 +389,12 @@ func (fa FileAttr) SourceName(encryptedSuffix string) string {
 		sourceName += literalSuffix
 	}
 	if fa.Template {
-		sourceName += TemplateSuffix
+		switch fa.TemplateEngine {
+		case TemplateEngineJinja:
+			sourceName += JinjaSuffix
+		default:
+			sourceName += TemplateSuffix
+		}
 	}
 	if fa.Encrypted {
 		sourceName += encryptedSuffix

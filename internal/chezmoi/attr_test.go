@@ -182,6 +182,11 @@ func TestFileAttr(t *testing.T) {
 		Type:       SourceFileTypeSymlink,
 		TargetName: targetNames,
 	}))
+	for i := range fileAttrs {
+		if fileAttrs[i].Template {
+			fileAttrs[i].TemplateEngine = TemplateEngineGo
+		}
+	}
 	for _, fileAttr := range fileAttrs {
 		actualSourceName := fileAttr.SourceName("")
 		t.Run(actualSourceName, func(t *testing.T) {
@@ -279,9 +284,10 @@ func TestFileAttrLiteral(t *testing.T) {
 		{
 			sourceName: "file.tmpl",
 			fileAttr: FileAttr{
-				TargetName: "file",
-				Type:       SourceFileTypeFile,
-				Template:   true,
+				TargetName:     "file",
+				Type:           SourceFileTypeFile,
+				Template:       true,
+				TemplateEngine: TemplateEngineGo,
 			},
 		},
 		{
@@ -294,9 +300,38 @@ func TestFileAttrLiteral(t *testing.T) {
 		{
 			sourceName: "file.tmpl.literal.tmpl",
 			fileAttr: FileAttr{
-				TargetName: "file.tmpl",
-				Type:       SourceFileTypeFile,
-				Template:   true,
+				TargetName:     "file.tmpl",
+				Type:           SourceFileTypeFile,
+				Template:       true,
+				TemplateEngine: TemplateEngineGo,
+			},
+		},
+		{
+			sourceName: "file.j2",
+			fileAttr: FileAttr{
+				TargetName:     "file",
+				Type:           SourceFileTypeFile,
+				Template:       true,
+				TemplateEngine: TemplateEngineJinja,
+			},
+		},
+		{
+			sourceName: "dot_bashrc.j2",
+			fileAttr: FileAttr{
+				TargetName:     ".bashrc",
+				Type:           SourceFileTypeFile,
+				Template:       true,
+				TemplateEngine: TemplateEngineJinja,
+			},
+		},
+		{
+			sourceName: "executable_dot_script.j2",
+			fileAttr: FileAttr{
+				TargetName:     ".script",
+				Type:           SourceFileTypeFile,
+				Executable:     true,
+				Template:       true,
+				TemplateEngine: TemplateEngineJinja,
 			},
 		},
 	} {
@@ -389,6 +424,7 @@ func TestInvalidFileAttr(t *testing.T) {
 		"dot_",
 		"literal_",
 		".tmpl",
+		".j2",
 		"encrypted_.age",
 	} {
 		t.Run(tc, func(t *testing.T) {

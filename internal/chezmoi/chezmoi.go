@@ -77,7 +77,7 @@ var (
 	filePrefixRx = regexp.MustCompile(
 		`\A(after|before|create|dot|empty|encrypted|executable|literal|modify|once|private|readonly|remove|run|symlink)_`,
 	)
-	fileSuffixRx = regexp.MustCompile(`\.(literal|tmpl)\z`)
+	fileSuffixRx = regexp.MustCompile(`\.(j2|literal|tmpl)\z`)
 	whitespaceRx = regexp.MustCompile(`\s+`)
 )
 
