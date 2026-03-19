@@ -1,0 +1,13 @@
+# Test that .j2 files are processed with the Jinja template engine
+
+exec chezmoi apply --force
+
+cmp $HOME/.greeting golden/.greeting
+
+-- home/user/.config/chezmoi/chezmoi.toml --
+[data]
+    name = "world"
+-- home/user/.local/share/chezmoi/dot_greeting.j2 --
+name={{ name }}
+-- golden/.greeting --
+name=world
