@@ -1064,7 +1064,7 @@ func (s *SourceState) Read(ctx context.Context, options *ReadOptions) error {
 			return fs.SkipDir
 		case s.templateDataOnly:
 			return nil
-		case isPrefixDotFormat(fileInfo.Name(), externalName) || isPrefixDotFormatDotTmpl(fileInfo.Name(), externalName):
+		case isPrefixDotFormat(fileInfo.Name(), externalName) || isPrefixDotFormatDotTmpl(fileInfo.Name(), externalName) || isPrefixDotFormatDotJ2(fileInfo.Name(), externalName):
 			parentAbsPath, _ := sourceAbsPath.Split()
 			return s.addExternal(sourceAbsPath, parentAbsPath)
 		case fileInfo.Name() == externalsDirName:
@@ -1072,9 +1072,9 @@ func (s *SourceState) Read(ctx context.Context, options *ReadOptions) error {
 				return err
 			}
 			return fs.SkipDir
-		case fileInfo.Name() == ignoreName || fileInfo.Name() == ignoreName+TemplateSuffix:
+		case fileInfo.Name() == ignoreName || fileInfo.Name() == ignoreName+TemplateSuffix || fileInfo.Name() == ignoreName+JinjaSuffix:
 			return s.addPatterns(s.ignore, sourceAbsPath, parentSourceRelPath)
-		case fileInfo.Name() == removeName || fileInfo.Name() == removeName+TemplateSuffix:
+		case fileInfo.Name() == removeName || fileInfo.Name() == removeName+TemplateSuffix || fileInfo.Name() == removeName+JinjaSuffix:
 			return s.addPatterns(s.remove, sourceAbsPath, parentSourceRelPath)
 		case fileInfo.Name() == scriptsDirName:
 			scriptsDirSourceStateEntries, err := s.readScriptsDir(ctx, sourceAbsPath)
@@ -1429,7 +1429,7 @@ func (s *SourceState) addExternal(sourceAbsPath, parentAbsPath AbsPath) error {
 		return err
 	}
 
-	format, err := FormatFromAbsPath(sourceAbsPath.TrimSuffix(TemplateSuffix))
+	format, err := FormatFromAbsPath(sourceAbsPath.TrimSuffix(TemplateSuffix).TrimSuffix(JinjaSuffix))
 	if err != nil {
 		return err
 	}

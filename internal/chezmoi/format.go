@@ -226,6 +226,15 @@ func isPrefixDotFormatDotTmpl(name, prefix string) bool {
 	return false
 }
 
+func isPrefixDotFormatDotJ2(name, prefix string) bool {
+	for extension := range FormatsByExtension {
+		if name == prefix+"."+extension+JinjaSuffix {
+			return true
+		}
+	}
+	return false
+}
+
 // replaceJSONNumbersWithNumericValues replaces any json.Numbers in value with
 // int64s or float64s if possible and returns the new value. If value is a slice
 // or a map then it is mutated in place.
