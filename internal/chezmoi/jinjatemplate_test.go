@@ -116,3 +116,125 @@ func TestJinjaTemplateExpression(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "hello world", string(result))
 }
+
+func TestJinjaTemplateIncludeSubTemplate(t *testing.T) {
+	// Parse the sub-template.
+	sub := &JinjaTemplate{}
+	err := sub.Parse("header.j2", []byte("Welcome, {{ name }}!"), TemplateOptions{})
+	assert.NoError(t, err)
+
+	// Parse the main template that includes the sub-template.
+	main := &JinjaTemplate{}
+	err = main.Parse("main.j2", []byte(`{% include "header.j2" %} Goodbye.`), TemplateOptions{})
+	assert.NoError(t, err)
+
+	// Register the sub-template.
+	err = main.AddSubTemplate("header.j2", sub)
+	assert.NoError(t, err)
+
+	result, err := main.Execute(map[string]any{"name": "Alice"})
+	assert.NoError(t, err)
+	assert.Equal(t, "Welcome, Alice! Goodbye.", string(result))
+}
+
+func TestJinjaTemplateIncludeNestedPath(t *testing.T) {
+	// Sub-template with a path-like name (simulating .chezmoitemplates/dir/file.j2).
+	sub := &JinjaTemplate{}
+	err := sub.Parse("partials/greeting.j2", []byte("Hello {{ name }}"), TemplateOptions{})
+	assert.NoError(t, err)
+
+	main := &JinjaTemplate{}
+	err = main.Parse("main.j2", []byte(`{% include "partials/greeting.j2" %}`), TemplateOptions{})
+	assert.NoError(t, err)
+
+	err = main.AddSubTemplate("partials/greeting.j2", sub)
+	assert.NoError(t, err)
+
+	result, err := main.Execute(map[string]any{"name": "Bob"})
+	assert.NoError(t, err)
+	assert.Equal(t, "Hello Bob", string(result))
+}
+
+func TestJinjaTemplateStructFieldAccess(t *testing.T) {
+	type SSHKey struct {
+		Key     string
+		Comment string
+	}
+
+	type SecretEntry struct {
+		Notes  string
+		Fields []struct {
+			Name  string
+			Value string
+		}
+	}
+
+	funcs := template.FuncMap{
+		"getKeys": func(user string) []SSHKey {
+			return []SSHKey{
+				{Key: "ssh-ed25519 AAAA...", Comment: user + "@work"},
+				{Key: "ssh-rsa BBBB...", Comment: user + "@home"},
+			}
+		},
+		"getSecret": func(name string) SecretEntry {
+			return SecretEntry{
+				Notes: "secret-note-for-" + name,
+				Fields: []struct {
+					Name  string
+					Value string
+				}{
+					{Name: "public_key", Value: "ssh-ed25519 CCCC..."},
+				},
+			}
+		},
+	}
+
+	t.Run("for_loop_with_struct_field_access", func(t *testing.T) {
+		engine := &JinjaTemplate{}
+		err := engine.Parse("test", []byte(
+			`{% for key in getKeys("alice") %}{{ key.Key }} {{ key.Comment }}`+"\n"+`{% endfor %}`,
+		), TemplateOptions{Funcs: funcs})
+		assert.NoError(t, err)
+
+		result, err := engine.Execute(map[string]any{})
+		assert.NoError(t, err)
+		assert.Equal(t, "ssh-ed25519 AAAA... alice@work\nssh-rsa BBBB... alice@home\n", string(result))
+	})
+
+	t.Run("struct_field_access_on_function_return", func(t *testing.T) {
+		engine := &JinjaTemplate{}
+		err := engine.Parse("test", []byte(
+			`{{ getSecret("mykey").Notes }}`,
+		), TemplateOptions{Funcs: funcs})
+		assert.NoError(t, err)
+
+		result, err := engine.Execute(map[string]any{})
+		assert.NoError(t, err)
+		assert.Equal(t, "secret-note-for-mykey", string(result))
+	})
+
+	t.Run("struct_slice_index_and_field_access", func(t *testing.T) {
+		engine := &JinjaTemplate{}
+		err := engine.Parse("test", []byte(
+			`{{ getSecret("mykey").Fields[0].Value }}`,
+		), TemplateOptions{Funcs: funcs})
+		assert.NoError(t, err)
+
+		result, err := engine.Execute(map[string]any{})
+		assert.NoError(t, err)
+		assert.Equal(t, "ssh-ed25519 CCCC...", string(result))
+	})
+}
+
+func TestJinjaTemplateAddSubTemplateWrongType(t *testing.T) {
+	main := &JinjaTemplate{}
+	err := main.Parse("main.j2", []byte("test"), TemplateOptions{})
+	assert.NoError(t, err)
+
+	goTmpl := &GoTemplate{}
+	err = goTmpl.Parse("sub", []byte("test"), TemplateOptions{})
+	assert.NoError(t, err)
+
+	err = main.AddSubTemplate("sub", goTmpl)
+	assert.Error(t, err)
+}

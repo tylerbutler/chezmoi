@@ -9,15 +9,16 @@ import (
 	"github.com/nikolalohinski/gonja/v2/builtins"
 	"github.com/nikolalohinski/gonja/v2/config"
 	"github.com/nikolalohinski/gonja/v2/exec"
-	"github.com/nikolalohinski/gonja/v2/loaders"
 )
 
 // JinjaTemplate implements TemplateEngine using gonja v2 (Jinja2 for Go).
 type JinjaTemplate struct {
 	name     string
+	source   string // raw template source for sub-template registration
 	template *exec.Template
 	options  TemplateOptions
 	globals  map[string]any
+	loader   *mutableLoader
 }
 
 // EngineType implements TemplateEngine.
@@ -64,13 +65,8 @@ func (t *JinjaTemplate) Parse(name string, data []byte, options TemplateOptions)
 	// Create a unique identifier for the template.
 	rootID := fmt.Sprintf("/%s-%x", name, sha256.Sum256(contents))
 
-	// Create a memory loader that serves our template source.
-	loader, err := loaders.NewMemoryLoader(map[string]string{
-		rootID: string(contents),
-	})
-	if err != nil {
-		return fmt.Errorf("%s: %w", name, err)
-	}
+	// Create a mutable loader so sub-templates can be added later via AddSubTemplate.
+	loader := newMutableLoader(rootID, string(contents))
 
 	tmpl, err := exec.NewTemplate(rootID, config.New(), loader, env)
 	if err != nil {
@@ -78,8 +74,10 @@ func (t *JinjaTemplate) Parse(name string, data []byte, options TemplateOptions)
 	}
 
 	t.name = name
+	t.source = string(contents)
 	t.template = tmpl
 	t.options = options
+	t.loader = loader
 	return nil
 }
 
@@ -116,13 +114,12 @@ func (t *JinjaTemplate) Execute(data any) ([]byte, error) {
 
 // AddSubTemplate implements TemplateEngine.
 func (t *JinjaTemplate) AddSubTemplate(name string, engine TemplateEngine) error {
-	_, ok := engine.(*JinjaTemplate)
+	jinjaTmpl, ok := engine.(*JinjaTemplate)
 	if !ok {
 		return fmt.Errorf("cannot add %s template %q to Jinja template engine", engine.EngineType(), name)
 	}
-	// For the MVP, sub-template registration is a no-op.
-	// Jinja users can use {% include %} with file system templates,
-	// but dynamic sub-template registration from the .chezmoitemplates
-	// directory requires a custom loader (deferred to follow-up).
+	// Register the sub-template's source in the mutable loader so that
+	// gonja's {% include "name" %} can resolve and load it at execution time.
+	t.loader.Add(name, jinjaTmpl.source)
 	return nil
 }

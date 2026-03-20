@@ -1,0 +1,29 @@
+# Test that .j2 templates can include sub-templates from .chezmoitemplates
+
+exec chezmoi apply --force
+
+cmp $HOME/.myconfig  golden/.myconfig
+cmp $HOME/.nested    golden/.nested
+
+-- home/user/.config/chezmoi/chezmoi.toml --
+[data]
+    name = "alice"
+    editor = "vim"
+-- home/user/.local/share/chezmoi/.chezmoitemplates/header.j2 --
+# Managed by chezmoi - do not edit
+-- home/user/.local/share/chezmoi/.chezmoitemplates/partials/user-config.j2 --
+user={{ name }}
+editor={{ editor }}
+-- home/user/.local/share/chezmoi/dot_myconfig.j2 --
+{% include "header.j2" -%}
+{% include "partials/user-config.j2" -%}
+-- golden/.myconfig --
+# Managed by chezmoi - do not edit
+user=alice
+editor=vim
+-- home/user/.local/share/chezmoi/dot_nested.j2 --
+{% include "header.j2" -%}
+done
+-- golden/.nested --
+# Managed by chezmoi - do not edit
+done
