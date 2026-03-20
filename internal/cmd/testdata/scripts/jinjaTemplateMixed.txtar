@@ -1,0 +1,18 @@
+# Test that .tmpl (Go) and .j2 (Jinja) files coexist in the same source directory
+
+exec chezmoi apply --force
+
+cmp $HOME/.go-greeting    golden/.go-greeting
+cmp $HOME/.jinja-greeting golden/.jinja-greeting
+
+-- home/user/.config/chezmoi/chezmoi.toml --
+[data]
+    name = "world"
+-- home/user/.local/share/chezmoi/dot_go-greeting.tmpl --
+Hello from Go template, {{ .name }}!
+-- golden/.go-greeting --
+Hello from Go template, world!
+-- home/user/.local/share/chezmoi/dot_jinja-greeting.j2 --
+Hello from Jinja template, {{ name }}!
+-- golden/.jinja-greeting --
+Hello from Jinja template, world!

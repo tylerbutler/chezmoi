@@ -1,0 +1,51 @@
+# Test Jinja native boolean operators and bracket index access on maps
+
+exec chezmoi apply --force
+
+cmp $HOME/.platform   golden/.platform
+cmp $HOME/.wsl-check  golden/.wsl-check
+cmp $HOME/.os-info    golden/.os-info
+
+-- home/user/.config/chezmoi/chezmoi.toml --
+[data]
+    platform = "linux"
+    is_wsl = true
+    is_container = false
+    codespaces = false
+    kernel_release = "5.15.0-microsoft-standard"
+
+[data.os_info]
+    id = "ubuntu"
+    id_like = "debian"
+    version = "22.04"
+
+-- home/user/.local/share/chezmoi/dot_platform.j2 --
+{%- if platform == "linux" -%}
+PLATFORM=linux
+{%- elif platform == "darwin" -%}
+PLATFORM=macos
+{%- else -%}
+PLATFORM=other
+{%- endif %}
+-- golden/.platform --
+PLATFORM=linux
+-- home/user/.local/share/chezmoi/dot_wsl-check.j2 --
+{%- if platform == "linux" and not is_container -%}
+{%- if is_wsl -%}
+ENV=wsl
+{%- else -%}
+ENV=native
+{%- endif -%}
+{%- else -%}
+ENV=other
+{%- endif %}
+-- golden/.wsl-check --
+ENV=wsl
+-- home/user/.local/share/chezmoi/dot_os-info.j2 --
+id={{ os_info["id"] }}
+id_like={{ os_info["id_like"] }}
+codespaces={{ codespaces }}
+-- golden/.os-info --
+id=ubuntu
+id_like=debian
+codespaces=False

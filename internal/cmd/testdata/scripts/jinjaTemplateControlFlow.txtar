@@ -1,0 +1,36 @@
+# Test Jinja control flow (if/elif/else and for loops) using chezmoi variables
+
+exec chezmoi apply --force
+
+[darwin]  cmp $HOME/.profile golden/.profile-darwin
+[linux]   cmp $HOME/.profile golden/.profile-linux
+[windows] cmp $HOME/.profile golden/.profile-windows
+cmp $HOME/.packages golden/.packages
+
+-- home/user/.config/chezmoi/chezmoi.toml --
+[data]
+    packages = ["git", "curl", "jq"]
+-- home/user/.local/share/chezmoi/dot_profile.j2 --
+{%- if chezmoi.os == "linux" -%}
+export PLATFORM=linux
+{%- elif chezmoi.os == "darwin" -%}
+export PLATFORM=macos
+{%- else -%}
+export PLATFORM=other
+{%- endif %}
+-- golden/.profile-linux --
+export PLATFORM=linux
+-- golden/.profile-darwin --
+export PLATFORM=macos
+-- golden/.profile-windows --
+export PLATFORM=other
+-- home/user/.local/share/chezmoi/dot_packages.j2 --
+# Managed packages
+{%- for pkg in packages %}
+{{ loop.index }}. {{ pkg }}
+{%- endfor %}
+-- golden/.packages --
+# Managed packages
+1. git
+2. curl
+3. jq

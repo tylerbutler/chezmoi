@@ -1,0 +1,25 @@
+# Test that malformed .j2 files produce actionable errors
+
+# An unclosed block tag is a parse error; apply must fail and name the file
+! exec chezmoi apply --force
+stderr 'dot_broken\.j2: failed to parse template'
+
+chhome home2/user
+
+# After switching to a valid home, apply succeeds
+exec chezmoi apply --force
+cmp $HOME/.greeting golden/.greeting
+
+-- home/user/.config/chezmoi/chezmoi.toml --
+[data]
+    name = "world"
+-- home/user/.local/share/chezmoi/dot_broken.j2 --
+{% if name == "world" %}
+hello
+-- home2/user/.config/chezmoi/chezmoi.toml --
+[data]
+    name = "world"
+-- home2/user/.local/share/chezmoi/dot_greeting.j2 --
+hello {{ name }}
+-- golden/.greeting --
+hello world

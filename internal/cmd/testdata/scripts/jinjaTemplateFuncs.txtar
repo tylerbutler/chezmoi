@@ -1,0 +1,29 @@
+# Test chezmoi/sprig functions called from Jinja templates via the funcadapter
+[windows] skip 'joinPath uses OS-specific path separators'
+
+exec chezmoi apply --force
+
+cmp $HOME/.parsed     golden/.parsed
+cmp $HOME/.serialized golden/.serialized
+cmp $HOME/.joined     golden/.joined
+
+-- home/user/.config/chezmoi/chezmoi.toml --
+[data]
+    username = "alice"
+    port     = 8080
+-- home/user/.local/share/chezmoi/dot_parsed.j2 --
+{%- set obj = fromJson("{\"host\": \"localhost\", \"port\": 5432}") -%}
+host={{ obj.host }}
+port={{ obj.port }}
+-- golden/.parsed --
+host=localhost
+port=5432
+-- home/user/.local/share/chezmoi/dot_serialized.j2 --
+{%- set obj = fromJson("{\"host\": \"localhost\", \"port\": 5432}") -%}
+{{ toJson(obj) }}
+-- golden/.serialized --
+{"host":"localhost","port":5432}
+-- home/user/.local/share/chezmoi/dot_joined.j2 --
+{{ joinPath("home", username, ".config") }}
+-- golden/.joined --
+home/alice/.config

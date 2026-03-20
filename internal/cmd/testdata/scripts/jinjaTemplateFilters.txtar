@@ -1,0 +1,23 @@
+# Test chezmoi/sprig functions used as Jinja filters in pipeline syntax
+
+exec chezmoi apply --force
+
+cmp $HOME/.transformed  golden/.transformed
+cmp $HOME/.config-json  golden/.config-json
+
+-- home/user/.config/chezmoi/chezmoi.toml --
+[data]
+    username = "  Alice  "
+    host     = "localhost"
+    port     = 5432
+-- home/user/.local/share/chezmoi/dot_transformed.j2 --
+upper:{{ username | trim | upper }}
+lower:{{ username | trim | lower }}
+-- golden/.transformed --
+upper:ALICE
+lower:alice
+-- home/user/.local/share/chezmoi/dot_config-json.j2 --
+{%- set obj = fromJson("{\"host\": \"localhost\", \"port\": 5432}") -%}
+{{ obj | toJson }}
+-- golden/.config-json --
+{"host":"localhost","port":5432}
