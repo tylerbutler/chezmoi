@@ -1,0 +1,48 @@
+# Test Jinja for loops over arrays of maps with field access
+
+exec chezmoi apply --force
+
+cmp $HOME/.ssh-keys   golden/.ssh-keys
+cmp $HOME/.packages   golden/.packages
+
+-- home/user/.config/chezmoi/chezmoi.toml --
+[[data.ssh_keys]]
+    type = "ed25519"
+    comment = "alice@work"
+
+[[data.ssh_keys]]
+    type = "rsa"
+    comment = "alice@home"
+
+[[data.packages]]
+    name = "git"
+    required = true
+
+[[data.packages]]
+    name = "curl"
+    required = true
+
+[[data.packages]]
+    name = "neofetch"
+    required = false
+
+-- home/user/.local/share/chezmoi/dot_ssh-keys.j2 --
+# SSH Keys
+{%- for key in ssh_keys %}
+{{ key.type }} {{ key.comment }}
+{%- endfor %}
+-- golden/.ssh-keys --
+# SSH Keys
+ed25519 alice@work
+rsa alice@home
+-- home/user/.local/share/chezmoi/dot_packages.j2 --
+# Required packages
+{%- for pkg in packages -%}
+{%- if pkg.required %}
+{{ pkg.name }}
+{%- endif -%}
+{%- endfor %}
+-- golden/.packages --
+# Required packages
+git
+curl

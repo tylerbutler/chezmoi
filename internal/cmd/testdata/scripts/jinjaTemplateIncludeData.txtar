@@ -1,0 +1,35 @@
+# Test that included .j2 sub-templates receive template data context
+
+exec chezmoi apply --force
+
+cmp $HOME/.editor-config golden/.editor-config
+
+-- home/user/.config/chezmoi/chezmoi.toml --
+[data]
+    editor = "vim"
+    use_lsp = true
+
+[data.settings]
+    theme = "dark"
+    tab_size = 4
+
+-- home/user/.local/share/chezmoi/.chezmoitemplates/config/editor.j2 --
+editor={{ editor }}
+{%- if use_lsp %}
+lsp=enabled
+{%- else %}
+lsp=disabled
+{%- endif %}
+-- home/user/.local/share/chezmoi/.chezmoitemplates/config/theme.j2 --
+theme={{ settings.theme }}
+tab_size={{ settings.tab_size }}
+-- home/user/.local/share/chezmoi/dot_editor-config.j2 --
+# Editor Configuration
+{% include "config/editor.j2" -%}
+{% include "config/theme.j2" -%}
+-- golden/.editor-config --
+# Editor Configuration
+editor=vim
+lsp=enabled
+theme=dark
+tab_size=4
